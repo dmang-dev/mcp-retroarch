@@ -140,12 +140,22 @@ See [`docs/RECIPES.md`](docs/RECIPES.md) for end-to-end examples.
 
 Verified end-to-end against `mcp-retroarch`:
 
-| System | Core | `read_memory` (system map) | `read_ram` (CHEEVOS) | Notes |
+| System | Core | `read_memory` | `read_ram` | Notes |
 |---|---|---|---|---|
-| Game Boy Advance | `mgba_libretro` | ✅ | ✅ | Returns GBA interrupt vector table at `0x0000` (`d3 00 00 ea ...`) |
-| PlayStation 1 | `swanstation_libretro` | ❌ "no memory map defined" | ✅ | Use `read_ram`. Main RAM begins around CHEEVOS offset `0x010000`. |
+| Game Boy Advance | `mgba_libretro` | ✅ | ✅ | GBA interrupt vector table visible at `0x0000` (`d3 00 00 ea ...`) |
+| NES | `mesen_libretro` | ✅ **(only NES core that does)** | ✅ | Full 16-bit NES address space exposed. WRAM at `0x0000-0x07FF`, mirrored to `0x1FFF`. CHEEVOS bounded to first 64 KB. |
+| NES | `nestopia_libretro` | ❌ no memory map | ✅ | CHEEVOS only. 64 KB bound. **For NES + memory map, prefer Mesen.** |
+| SNES | `snes9x_libretro` | ❌ no memory map | ✅ | CHEEVOS bounded to ~128 KB (matches SNES WRAM size). 65C816 RTS opcodes (`60`) visible in code regions. |
+| Sega Mega Drive / Genesis | `genesis_plus_gx_libretro` | ❌ no memory map | ⚠️ **sparse** | CHEEVOS exposes some 68K WRAM addresses but fails at others ("no error message"). Usable if you know specific addresses; blanket sweep doesn't work. |
+| PlayStation 1 | `swanstation_libretro` | ❌ no memory map | ✅ | CHEEVOS only. PSX main RAM begins around CHEEVOS offset `0x010000` (lower addresses are typically zero). |
 
-If you've tested another core, please open a PR adding it.
+### Patterns observed
+
+- **Most libretro cores don't advertise a system memory map to NCI** — they implement only the CHEEVOS read API. Mesen is the one exception we've found.
+- **CHEEVOS bounds match the system's main RAM size** — NES exposes 64 KB, SNES 128 KB, etc. Reads past the bound fail with "no error message".
+- When choosing a core for memory work, **prefer the one with a system memory map** if available. It gives cleaner addresses and fewer surprises.
+
+If you've tested another core, please open a PR adding it to this table.
 
 ## Troubleshooting
 
