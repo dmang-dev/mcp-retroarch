@@ -136,12 +136,23 @@ Restart Claude Desktop after editing.
 
 See [`docs/RECIPES.md`](docs/RECIPES.md) for end-to-end examples.
 
+## Tested cores
+
+Verified end-to-end against `mcp-retroarch`:
+
+| System | Core | `read_memory` (system map) | `read_ram` (CHEEVOS) | Notes |
+|---|---|---|---|---|
+| Game Boy Advance | `mgba_libretro` | ✅ | ✅ | Returns GBA interrupt vector table at `0x0000` (`d3 00 00 ea ...`) |
+| PlayStation 1 | `swanstation_libretro` | ❌ "no memory map defined" | ✅ | Use `read_ram`. Main RAM begins around CHEEVOS offset `0x010000`. |
+
+If you've tested another core, please open a PR adding it.
+
 ## Troubleshooting
 
 | Symptom | Cause / Fix |
 |---|---|
-| `RetroArch query timed out` | Network Commands aren't enabled in RetroArch, or the port doesn't match `RETROARCH_PORT`. Confirm `network_cmd_enable = "true"` in `retroarch.cfg`. |
-| `READ_CORE_MEMORY failed: no memory map defined` | The loaded libretro core doesn't advertise a system memory map. Try `retroarch_read_ram` (CHEEVOS path) — many cores expose CHEEVOS even without a memory map. |
+| `RetroArch query timed out` | Network Commands aren't enabled in RetroArch, or the port doesn't match `RETROARCH_PORT`. Confirm `network_cmd_enable = "true"` in `retroarch.cfg`. **Also**: UDP datagrams can be dropped under load even on loopback — if a single call times out but a retry succeeds, that's the cause. The bridge doesn't auto-retry; just call again. |
+| `READ_CORE_MEMORY failed: no memory map defined` | The loaded libretro core doesn't advertise a system memory map. Try `retroarch_read_ram` (CHEEVOS path) — many cores expose CHEEVOS even without a memory map. Confirmed for SwanStation (PSX); use `read_ram` for that core. |
 | `READ_CORE_MEMORY failed: no descriptor for address` | The address isn't covered by the core's memory map. Either a different core would expose it, or the address you want is outside the system bus (e.g. video memory in some cores). |
 | Screenshots don't appear where I expect | RetroArch saves to its configured screenshot directory. The NCI doesn't expose `screenshot_directory` via `GET_CONFIG_PARAM`, so check the value via RetroArch's GUI: Settings → Directory → Screenshot. |
 | Can't save to a specific state slot directly | NCI limitation, not a bug. The protocol only exposes "save to current slot" — you have to walk the slot pointer to your target with `state_slot_plus`/`state_slot_minus`, then save. |

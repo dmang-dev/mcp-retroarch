@@ -144,6 +144,22 @@ If `ping` fails: RetroArch isn't running, Network Commands aren't enabled in `re
 
 ---
 
+## 10. PSX (SwanStation) — when read_memory says "no memory map"
+
+> "I'm playing a PS1 game in RetroArch with the SwanStation core. read_memory keeps failing — what gives?"
+
+SwanStation doesn't define a system memory map (verified — see README's Tested cores table). Use `read_ram` instead, which goes through the CHEEVOS address space. PSX main RAM starts mapping around CHEEVOS offset `0x010000`:
+
+```
+retroarch_read_ram(address=0x010000, length=64)
+```
+
+You should see real game code (MIPS R3000 instructions) and data, not zeros. Lower addresses (`0x0000`–`0x010000`) are typically the PSX kernel area and read as zeros for most games.
+
+A reasonable RAM-hunting starting point for PSX: scan from `0x010000` upward in 4096-byte chunks until you find the structure you're after.
+
+---
+
 ## What this server can NOT do (clearly)
 
 - **Send game-pad input.** NCI exposes RetroArch hotkeys (pause, reset, state slots, etc.) but NOT controller buttons. There's a separate "Remote RetroPad" libretro core on UDP port 55400+ that does, but it requires loading that specific core (you can't drive a normal emulation core through it).
