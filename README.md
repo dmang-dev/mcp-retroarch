@@ -143,17 +143,19 @@ Verified end-to-end against `mcp-retroarch`:
 | System | Core | `read_memory` | `read_ram` | Notes |
 |---|---|---|---|---|
 | Game Boy Advance | `mgba_libretro` | ✅ | ✅ | GBA interrupt vector table visible at `0x0000` (`d3 00 00 ea ...`) |
-| NES | `mesen_libretro` | ✅ **(only NES core that does)** | ✅ | Full 16-bit NES address space exposed. WRAM at `0x0000-0x07FF`, mirrored to `0x1FFF`. CHEEVOS bounded to first 64 KB. |
+| NES | `mesen_libretro` | ✅ **(only NES core tested that does)** | ✅ | Full 16-bit NES address space exposed. WRAM at `0x0000-0x07FF`, mirrored to `0x1FFF`. CHEEVOS bounded to first 64 KB. |
 | NES | `nestopia_libretro` | ❌ no memory map | ✅ | CHEEVOS only. 64 KB bound. **For NES + memory map, prefer Mesen.** |
 | SNES | `snes9x_libretro` | ❌ no memory map | ✅ | CHEEVOS bounded to ~128 KB (matches SNES WRAM size). 65C816 RTS opcodes (`60`) visible in code regions. |
 | Sega Mega Drive / Genesis | `genesis_plus_gx_libretro` | ❌ no memory map | ⚠️ **sparse** | CHEEVOS exposes some 68K WRAM addresses but fails at others ("no error message"). Usable if you know specific addresses; blanket sweep doesn't work. |
+| Nintendo 64 | `mupen64plus_next_libretro` | ✅ | ✅ | Full N64 RAM exposed. KSEG0 mirror is faithful — `read_memory(0x80000000)` returns the same bytes as `read_memory(0x0)`. Bound is the connected RAM size (4 MB without Expansion Pak, 8 MB with). |
 | PlayStation 1 | `swanstation_libretro` | ❌ no memory map | ✅ | CHEEVOS only. PSX main RAM begins around CHEEVOS offset `0x010000` (lower addresses are typically zero). |
 
 ### Patterns observed
 
-- **Most libretro cores don't advertise a system memory map to NCI** — they implement only the CHEEVOS read API. Mesen is the one exception we've found.
+- **Most libretro cores don't advertise a system memory map to NCI** — they implement only the CHEEVOS read API. Of those tested, only **Mesen** (NES) and **Mupen64Plus-Next** (N64) expose a system memory map. Both also expose CHEEVOS, so they're strictly better.
+- **System memory maps are faithful to real hardware** — Mupen64Plus-Next preserves the N64's KSEG0 mirror (`0x80000000` reads as `0x0`); Mesen preserves the NES's WRAM mirroring (`0x1000` reads as `0x0`). This is great for anyone using the bridge alongside disassembly.
 - **CHEEVOS bounds match the system's main RAM size** — NES exposes 64 KB, SNES 128 KB, etc. Reads past the bound fail with "no error message".
-- When choosing a core for memory work, **prefer the one with a system memory map** if available. It gives cleaner addresses and fewer surprises.
+- When choosing a core for memory work, **prefer the one with a system memory map** if available.
 
 If you've tested another core, please open a PR adding it to this table.
 
