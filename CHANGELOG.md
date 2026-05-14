@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-11
+
+### Changed
+
+- **Non-blocking startup.** The MCP transport now comes up immediately
+  instead of waiting on the RetroArch connectivity probe. Previously,
+  with no emulator reachable, startup blocked ~5s on the `VERSION`
+  query timeout (UDP has no fast "connection refused"), which delayed
+  `tools/list` introspection. The probe now runs in the background and
+  just logs its result; tool calls still connect on demand. Matters
+  for CI / registry containers (e.g. Glama) that expect fast
+  introspection.
+
+### Added
+
+- **Dockerfile** for the [Glama](https://glama.ai/mcp/servers) MCP
+  registry. Builds the server and runs it over stdio; introspection
+  works with no emulator present.
+
 ## [0.1.0] - 2026-05-10
 
 Initial public release.
@@ -45,5 +64,6 @@ Initial public release.
   saves to the currently-selected slot. To save to slot N, walk the
   slot pointer to N first via `state_slot_plus` / `state_slot_minus`.
 
-[Unreleased]: https://github.com/dmang-dev/mcp-retroarch/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dmang-dev/mcp-retroarch/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.1
 [0.1.0]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.0
