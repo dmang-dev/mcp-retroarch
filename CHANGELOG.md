@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-05-15
+
+Tool description quality pass — written to Glama's Tool Definition Quality
+Score (TDQS) rubric so every tool maximizes Purpose Clarity, Usage
+Guidelines, Behavioral Transparency, Parameter Semantics, Conciseness,
+and Contextual Completeness.
+
+### Changed
+
+- **Every tool description rewritten to the PURPOSE / USAGE / BEHAVIOR /
+  RETURNS template** — explicit error conditions, explicit
+  when-to-use-this-vs-sibling guidance (e.g. read_memory vs read_ram;
+  state_slot_plus/minus vs load_state_slot), explicit destructive-
+  behavior notes for state-mutating tools (`retroarch_write_*`,
+  `retroarch_reset`, `retroarch_load_state_*`, `retroarch_save_state_current`
+  slot overwrite), and explicit return-value shape.
+- **Fire-and-forget UDP semantics surfaced everywhere it matters** —
+  RetroArch's NCI doesn't acknowledge most state mutations. Every
+  affected tool's BEHAVIOR section now warns that the success message
+  is a UDP-send confirmation only, NOT verification that RetroArch
+  received or acted on the command. The lone exception
+  (`retroarch_write_memory`, which DOES return a byte count) is also
+  documented prominently as the contrast.
+- **Two distinct memory APIs documented** — `_memory` (system bus, via
+  CMD_CORE_MEMORY) vs `_ram` (libretro CHEEVOS map). Each tool says
+  which API it uses and recommends fallback paths if one returns "no
+  memory map defined".
+- **Slot-based savestate model** documented — NCI has no "save to slot
+  N" command, so `save_state_current` writes to whatever slot the GUI
+  currently has selected, and `state_slot_plus`/`minus` are the only
+  way to walk the pointer (current slot is not queryable; track
+  client-side or use `show_message` for echo confirmation).
+- **Every parameter now has a description** that adds context beyond
+  the JSON Schema (RetroArch slot conventions, memory address-space
+  caveats, message-display lifetime).
+
 ## [0.1.1] - 2026-05-11
 
 ### Changed
@@ -64,6 +100,7 @@ Initial public release.
   saves to the currently-selected slot. To save to slot N, walk the
   slot pointer to N first via `state_slot_plus` / `state_slot_minus`.
 
-[Unreleased]: https://github.com/dmang-dev/mcp-retroarch/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/dmang-dev/mcp-retroarch/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.2
 [0.1.1]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.1
 [0.1.0]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.0
