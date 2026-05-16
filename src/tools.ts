@@ -74,24 +74,24 @@ const TOOLS: Tool[] = [
   {
     name: "retroarch_get_config",
     description:
-      "PURPOSE: Read a single RetroArch configuration parameter by name via the NCI's GET_CONFIG_PARAM command. " +
-      "USAGE: Use to discover RetroArch's filesystem paths and selected settings without parsing retroarch.cfg yourself. For run-state (playing/paused, loaded ROM) use retroarch_get_status instead — this tool only reads static config values. NOTE: RetroArch whitelists which params are exposed via NCI; unknown / non-whitelisted names return an error from RetroArch even though they may exist in retroarch.cfg. The screenshot output directory is NOT exposed (see retroarch_screenshot). " +
-      `BEHAVIOR: No side effects — pure read. ${NCI_TRANSPORT_NOTE} Returns an error if the named param isn't in RetroArch's NCI whitelist, the value contains characters that break the line-based reply parser, or the UDP query times out. ` +
-      "RETURNS: Single line 'NAME = VALUE'.",
+      "PURPOSE: Read a single RetroArch configuration parameter by name via the NCI GET_CONFIG_PARAM command. " +
+      "USAGE: Discover RetroArch's filesystem paths and selected settings without parsing retroarch.cfg yourself. For run-state (playing/paused, loaded ROM) use retroarch_get_status instead — this tool only reads static config. RetroArch whitelists which params are exposed; non-whitelisted names error even if they exist in retroarch.cfg. `screenshot_directory` is NOT exposed — see retroarch_screenshot. " +
+      `BEHAVIOR: No side effects — pure read. ${NCI_TRANSPORT_NOTE} Errors if the param isn't in RetroArch's NCI whitelist, the value contains characters that break the line-based reply parser (rare — embedded newlines or null bytes), or the UDP query times out. ` +
+      "RETURNS: 'NAME = VALUE' where VALUE is the raw string as stored in retroarch.cfg (paths unquoted, booleans as 'true'/'false', integers as decimal).",
     inputSchema: {
       type: "object",
       required: ["name"],
       properties: {
         name: {
           type: "string",
+          minLength: 1,
           description:
-            "Config parameter name (case-sensitive). Commonly-supported values: " +
-            "`savefile_directory`, `savestate_directory`, `system_directory`, " +
-            "`cache_directory`, `log_dir`, `runtime_log_directory`, `netplay_nickname`, " +
-            "`video_fullscreen`. RetroArch's exact whitelist varies by version; if a " +
-            "name returns an error, it isn't exposed via the NCI on this build. " +
-            "`screenshot_directory` is NOT exposed by RetroArch — there is no NCI way " +
-            "to query the screenshot output path.",
+            "Config key — same snake_case ASCII identifier RetroArch uses in retroarch.cfg, case-sensitive, no surrounding quotes. " +
+            "Path-class keys (return absolute paths on disk): `savefile_directory`, `savestate_directory`, `system_directory`, `cache_directory`, `log_dir`, `runtime_log_directory`, `core_assets_directory`. " +
+            "User-data keys: `netplay_nickname`. " +
+            "Toggle keys (return 'true' / 'false'): `video_fullscreen`, `video_vsync`, `audio_mute_enable`. " +
+            "The full whitelist varies per RetroArch build; if a key returns an error rather than a value, it's not exposed via the NCI on this build. " +
+            "Notable exclusions: `screenshot_directory` is intentionally NOT exposed by RetroArch (see retroarch_screenshot for the workaround). Also no key for the currently-selected savestate slot — track that client-side via retroarch_state_slot_plus/minus.",
         },
       },
       additionalProperties: false,
@@ -278,22 +278,23 @@ const TOOLS: Tool[] = [
   {
     name: "retroarch_show_message",
     description:
-      "PURPOSE: Display a single-line notification message overlaid on the RetroArch window (OSD overlay). " +
-      "USAGE: Use for in-emulator debug output, progress markers during long-running scripts, or to communicate with a human watching the RetroArch window. The overlay appears in RetroArch's standard notification area and fades out after RetroArch's configured notification timeout. This is purely cosmetic — it has no effect on game state. There is no sibling tool: this is the ONLY way to push text from the agent onto the RetroArch display. " +
-      `BEHAVIOR: Renders the supplied message string in RetroArch's on-screen notification area. ${FIRE_AND_FORGET_NOTE} Messages are not queued — calling rapidly will replace the previous message before users can read it. Line breaks in the message are stripped (NCI is line-based). ${NCI_TRANSPORT_NOTE} ` +
-      "RETURNS: Single line 'Showed: MESSAGE' echoing what was sent (UDP-send confirmation only — does NOT verify that the overlay was actually rendered).",
+      "PURPOSE: Display a single-line notification message overlaid on the RetroArch window (OSD). " +
+      "USAGE: For in-emulator debug output, progress markers during long scripts, or text to a human watching the RetroArch window. Purely cosmetic — no effect on game state. The ONLY way to push agent-generated text onto the RetroArch display; there is no read-the-screen counterpart. " +
+      `BEHAVIOR: Renders the message in RetroArch's notification area for ~3 seconds (RetroArch's default notification timeout, configurable via the input_overlay_show_inputs_port setting family). Messages are NOT queued — rapid calls replace the previous message before users can read it. ${FIRE_AND_FORGET_NOTE} ${NCI_TRANSPORT_NOTE} ` +
+      "RETURNS: 'Showed: MESSAGE' echoing what was sent (UDP-send confirmation only — does NOT verify the overlay rendered).",
     inputSchema: {
       type: "object",
       required: ["message"],
       properties: {
         message: {
           type: "string",
+          minLength: 1,
           description:
-            "Message text to display. Spaces inside the string are preserved; line breaks " +
-            "(\\n / \\r) are NOT — the NCI protocol is line-terminated, so newlines truncate " +
-            "the message. Keep messages short (one line, ~80 chars) to fit RetroArch's " +
-            "notification overlay without clipping. Consecutive calls replace the previous " +
-            "message rather than queueing.",
+            "UTF-8 message text. Spaces and most punctuation are preserved verbatim. " +
+            "NEWLINES (\\n / \\r) TRUNCATE the message — the NCI protocol is line-terminated, so anything after the first newline is silently dropped on the wire. " +
+            "Keep messages to ONE LINE; recommended ≤80 chars to fit RetroArch's notification overlay without horizontal clipping (the exact width depends on the user's video resolution and font size). " +
+            "Consecutive calls REPLACE rather than queue, so use one message per logical event rather than emitting a stream of status updates. " +
+            "Special characters: percent-signs are safe (RetroArch does NOT printf-interpret the string), quotes are safe (no shell interpolation), but ASCII control bytes other than space are likely rendered as boxes or stripped.",
         },
       },
       additionalProperties: false,
