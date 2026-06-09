@@ -4,6 +4,10 @@
 [![npm downloads](https://img.shields.io/npm/dm/mcp-retroarch.svg)](https://www.npmjs.com/package/mcp-retroarch)
 [![CI](https://github.com/dmang-dev/mcp-retroarch/actions/workflows/ci.yml/badge.svg)](https://github.com/dmang-dev/mcp-retroarch/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/mcp-retroarch.svg)](LICENSE)
+[![Snyk](https://snyk.io/test/npm/mcp-retroarch/badge.svg)](https://snyk.io/test/npm/mcp-retroarch)
+[![Socket](https://img.shields.io/badge/Socket-security-2F7BFF?logo=socket)](https://socket.dev/npm/package/mcp-retroarch)
+[![Bundlephobia](https://img.shields.io/badge/bundlephobia-size-FF6B81)](https://bundlephobia.com/package/mcp-retroarch)
+[![npmgraph](https://img.shields.io/badge/npmgraph-dependencies-2496ED)](https://npmgraph.js.org/?q=mcp-retroarch)
 
 An [MCP](https://modelcontextprotocol.io) server that bridges Claude (and any other MCP client) to [RetroArch](https://www.retroarch.com/) via its built-in **Network Control Interface** (UDP, port 55355).
 
