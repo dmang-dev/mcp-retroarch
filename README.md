@@ -40,7 +40,7 @@ If you need game-pad input on Game Boy Advance specifically, see [mcp-mgba](http
 ## Requirements
 
 - **RetroArch** (any recent version) with Network Commands enabled
-- **Node.js 18+**
+- **Node.js 22+**
 
 ## Install
 
