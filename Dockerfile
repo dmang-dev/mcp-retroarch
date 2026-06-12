@@ -8,7 +8,7 @@
 # For actual use you don't need Docker — `npm install -g mcp-retroarch` and
 # point it at a running RetroArch with Network Commands enabled. See README.md.
 
-FROM node:22-trixie-slim
+FROM node:22-trixie-slim@sha256:8cd0ffd483b64585c6d135364bea5f937ff40cd3da431789af011f9ee8d55af0
 WORKDIR /app
 
 # Install dependencies. --ignore-scripts skips the `prepare` hook; we run the
