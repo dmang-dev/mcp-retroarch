@@ -185,6 +185,16 @@ Smoke test against a running RetroArch:
 node .scratch/smoke.cjs
 ```
 
+## Debugging with the MCP Inspector
+
+Browse and call this server's tools interactively with the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+```bash
+npm run inspector
+```
+
+Build first if you've edited `src/` since your last `npm install` (`npm run build`, or keep `npm run dev` running). Override the target with `RETROARCH_HOST` / `RETROARCH_PORT` (default `127.0.0.1:55355`). `tools/list` works even without RetroArch connected; *calling* a tool needs RetroArch running with Network Commands enabled.
+
 ## License
 
 [MIT](LICENSE)
