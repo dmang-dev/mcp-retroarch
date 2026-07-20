@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-11
+
 ### Changed
 
 - **BREAKING: minimum Node version raised from >=18 to >=22.** Node 18 (EOL
@@ -14,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   LTS lines are. CI matrix now tests Node 22 + 24, and workflow actions
   bumped to `actions/checkout@v5` / `actions/setup-node@v5` (the v4 actions'
   Node 20 runtime is deprecated by GitHub as of June 2026).
+- **Docker base image moved to Debian 13 "trixie"** — the Dockerfile now
+  builds `FROM node:22-trixie-slim` instead of `node:22-slim`.
+- **Expanded `retroarch_get_config` and `retroarch_show_message` parameter
+  documentation** in the tool definitions.
+- **README badges added** for Socket, Snyk, Bundlephobia, and npmgraph.
+- **`.claude/` added to `.gitignore`** to keep pipeline artifacts out of the
+  public repo.
+
+### Security
+
+- **Transitive dependencies bumped** to clear outstanding `npm audit`
+  advisories.
 
 ## [0.1.2] - 2026-05-15
 
@@ -108,7 +122,8 @@ Initial public release.
   saves to the currently-selected slot. To save to slot N, walk the
   slot pointer to N first via `state_slot_plus` / `state_slot_minus`.
 
-[Unreleased]: https://github.com/dmang-dev/mcp-retroarch/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/dmang-dev/mcp-retroarch/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.3
 [0.1.2]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.2
 [0.1.1]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.1
 [0.1.0]: https://github.com/dmang-dev/mcp-retroarch/releases/tag/v0.1.0
