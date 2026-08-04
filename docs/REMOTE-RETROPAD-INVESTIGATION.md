@@ -1,6 +1,25 @@
 # Adding game-pad input to mcp-retroarch — investigation notes
 
-Status: scoping, mostly unknowns. Nothing implemented.
+Status: **RESOLVED — implemented in v0.2.0.** The open questions below were
+answered by reading the RetroArch source; the historical notes are kept for
+context. Summary of answers:
+
+- **Wire format:** `struct remote_message { int port; int device; int index;
+  int id; uint16_t state; }` — sent as raw struct bytes (`sendto(&msg,
+  sizeof(msg))`), 20 bytes with standard alignment, little-endian. Defined in
+  `input/input_driver.h`; receiver in `input/input_driver.c`
+  (`input_remote_parse_packet`).
+- **Handshake:** none. Pure fire-and-forget UDP, same as the NCI.
+- **Packet rate / latching:** the receiver consumes at most ONE datagram per
+  emulated frame per player, and state LATCHES — a button stays pressed until
+  an explicit `state=0` message. No keepalive needed.
+- **Analog:** `device = RETRO_DEVICE_ANALOG (2)`, `index` 0/1 = left/right
+  stick, `id` 0/1 = X/Y, `state` = int16.
+- **Bonus:** a datagram of any size ≠ 20 makes the receiver zero ALL input
+  for that player — used deliberately by `retroarch_input_release_all`.
+- **The core-conflict fear was a misreading:** the "Remote RetroPad" *core*
+  is only the reference sender. The receiver is a plain RetroArch setting
+  (`network_remote_enable` + per-user flags), so the game core keeps running.
 
 The big shortcoming of `mcp-retroarch` v0.1.0 is no game-pad input — RetroArch's Network Control Interface only exposes hotkeys and menu navigation, not player-controller buttons. This document captures what we know about the realistic ways to fix that.
 

@@ -160,11 +160,38 @@ A reasonable RAM-hunting starting point for PSX: scan from `0x010000` upward in 
 
 ---
 
+## Frame-accurate scripted input (deterministic capture)
+
+> "From savestate slot 1, hold Right for exactly 8 frames, then read the
+> player-X coordinate."
+
+Requires Network Gamepad enabled in addition to Network Commands (see the
+README's *Game-pad input* section). Two receiver rules drive the shape of the
+script: input state **latches** until released, and RetroArch applies at most
+**one input datagram per emulated frame** per player.
+
+```
+1. retroarch_get_status                        # confirm 'playing' vs 'paused'
+2. retroarch_pause_toggle                      # pause (only if currently playing)
+3. retroarch_load_state_slot(slot=1)           # known anchor state
+4. retroarch_input_release_all                 # no latched leftovers
+5. retroarch_frame_advance                     # applies the release_all packet
+6. retroarch_input_press(buttons=["right"])
+7. retroarch_frame_advance                     # frame 1 — press applies here
+8. retroarch_frame_advance  × 7                # frames 2-8, Right held (latched)
+9. retroarch_input_release(buttons=["right"])
+10. retroarch_frame_advance                    # release applies
+11. retroarch_read_memory(address=..., length=...)   # observe the result
+```
+
+Because every step is explicit — anchor state, one datagram per frame advance,
+then observe — the same script produces the same bytes every run. For casual
+(non-frame-accurate) play while running, use `retroarch_input_tap` instead:
+press → ~100 ms hold → release in one call.
+
+---
+
 ## What this server can NOT do (clearly)
-
-- **Send game-pad input.** NCI exposes RetroArch hotkeys (pause, reset, state slots, etc.) but NOT controller buttons. There's a separate "Remote RetroPad" libretro core on UDP port 55400+ that does, but it requires loading that specific core (you can't drive a normal emulation core through it).
-
-  If you need input automation, see [mcp-mgba](https://github.com/dmang-dev/mcp-mgba) (Game Boy Advance, full input + screenshot via Lua bridge).
 
 - **Save to a specific slot in one call.** NCI has no `SAVE_STATE_SLOT N` command — only the slot-pointer + save-current dance shown in recipe #7.
 

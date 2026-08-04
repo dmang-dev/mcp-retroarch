@@ -24,7 +24,7 @@ Works against any libretro core (NES, SNES, Genesis, GB/GBC/GBA, PSX, N64, etc.)
 | Reset | ✅ | Hard-reset the running game |
 | On-screen message | ✅ | Useful for "look here" cues during scripted runs |
 | Game info | ✅ | Title, system, CRC32 |
-| **Game-pad input** | ❌ | **NCI doesn't expose this.** RetroArch has a separate "Remote RetroPad" core on UDP port 55400 that does, but it requires loading that specific core (you can't drive an existing emulation core through it). Not in scope for v0.1.0. |
+| **Game-pad input** | ✅ | Via RetroArch's **Network Gamepad** receiver (UDP 55400 + player) — a separate channel from the NCI, enabled with `network_remote_enable` in `retroarch.cfg`. Buttons, analog sticks, press/hold/release, per-player. The old blocker ("requires loading the Remote RetroPad core") was a misreading: that core is only the reference *sender*; the receiver is a plain RetroArch setting, so your game core keeps running. See [Game-pad input](#game-pad-input). |
 
 If you need game-pad input on Game Boy Advance specifically, see [mcp-mgba](https://github.com/dmang-dev/mcp-mgba). For PCSX2 (memory + savestate only, no input/screenshot), see [mcp-pine](https://github.com/dmang-dev/mcp-pine).
 
@@ -118,6 +118,38 @@ Restart Claude Desktop after editing.
 |---------------------|---------------|---------|
 | `RETROARCH_HOST`    | `127.0.0.1`   | UDP destination host |
 | `RETROARCH_PORT`    | `55355`       | UDP port (must match `network_cmd_port` in `retroarch.cfg`) |
+| `RETROARCH_RETROPAD_HOST` | `RETROARCH_HOST` | Input-channel host (Network Gamepad receiver) |
+| `RETROARCH_RETROPAD_BASE_PORT` | `55400` | Input-channel base port (must match `network_remote_base_port`); player N uses base + N |
+
+## Game-pad input
+
+Input goes over RetroArch's **Network Gamepad** channel, not the NCI. Enable it
+on the RetroArch side (in addition to Network Commands):
+
+```ini
+# retroarch.cfg
+network_remote_enable = "true"
+network_remote_base_port = "55400"
+network_remote_enable_user_p1 = "true"   # one flag per player you want to drive
+```
+
+(Or Settings → Input → Network Gamepad.) The wire protocol is RetroArch's
+`struct remote_message` — 20-byte little-endian datagrams, one UDP socket per
+player at `base_port + player`.
+
+Two receiver behaviors shape how you script input:
+
+1. **State latches.** A pressed button stays down until you send a release.
+   Bracket scripted sessions with `retroarch_input_release_all`.
+2. **One datagram per frame.** RetroArch consumes at most one queued input
+   message per emulated frame per player. For frame-accurate sequences: pause,
+   then alternate one input call with one `retroarch_frame_advance`. For
+   ordinary play while running, `retroarch_input_tap` (press → hold ~100 ms →
+   release) is the workhorse.
+
+Button names are libretro RetroPad names (`b y select start up down left right
+a x l r l2 r2 l3 r3`); on PlayStation cores `b`=Cross, `a`=Circle, `y`=Square,
+`x`=Triangle.
 
 ## Tools
 
@@ -137,6 +169,10 @@ Restart Claude Desktop after editing.
 | `retroarch_load_state_current` | Load from currently-selected slot |
 | `retroarch_load_state_slot` | Load from explicit slot number |
 | `retroarch_state_slot_plus` / `retroarch_state_slot_minus` | Change current slot pointer (NCI has no "set slot to N") |
+| `retroarch_input_press` / `retroarch_input_release` | Latch RetroPad buttons down / up (Network Gamepad channel) |
+| `retroarch_input_tap` | Press, hold (default 100 ms), release — everyday input |
+| `retroarch_input_set_analog` | Set left/right stick X/Y (int16, latches until changed) |
+| `retroarch_input_release_all` | Zero all buttons + sticks for a player in one packet |
 
 See [`docs/RECIPES.md`](docs/RECIPES.md) for end-to-end examples.
 
