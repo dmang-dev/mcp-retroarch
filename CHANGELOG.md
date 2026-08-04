@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-04
+
+### Added
+
+- **Game-pad input** via RetroArch's Network Gamepad receiver (UDP
+  `network_remote_base_port` + player, default 55400+). New tools:
+  `retroarch_input_press`, `retroarch_input_release`, `retroarch_input_tap`,
+  `retroarch_input_set_analog`, `retroarch_input_release_all`. The wire
+  format is RetroArch's `struct remote_message` (20-byte little-endian
+  datagram; exact size required by the receiver), sourced from
+  `input/input_driver.c` / `input_driver.h`. Two receiver behaviors are
+  documented on every tool: state latches until an explicit release, and at
+  most one queued datagram is applied per emulated frame per player.
+  `retroarch_input_release_all` exploits the receiver's zero-on-wrong-size
+  behavior to clear a player's entire input state in a single packet.
+- New env vars `RETROARCH_RETROPAD_HOST` / `RETROARCH_RETROPAD_BASE_PORT`
+  for the input channel (defaults: NCI host / 55400).
+- Packet-level test suite (`node:test`, loopback UDP listener, no RetroArch
+  required) pinning the exact struct bytes; `npm test` script added.
+
+### Changed
+
+- `docs/REMOTE-RETROPAD-INVESTIGATION.md` updated: the open questions
+  (wire format, handshake, packet-rate semantics) are answered from the
+  RetroArch source and the "defer" recommendation is superseded.
+
 ## [0.1.3] - 2026-06-11
 
 ### Changed

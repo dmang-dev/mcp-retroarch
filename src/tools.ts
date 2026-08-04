@@ -5,6 +5,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { RetroArchClient } from "./retroarch.js";
+import { RetropadClient, BUTTON_IDS, type StickName } from "./retropad.js";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Tool descriptions are written to the TDQS rubric (Glama's Tool Definition
@@ -49,6 +50,25 @@ const MEMORY_API_NOTE =
   "fallback when read_memory returns 'no memory map defined'.\n" +
   "Both APIs depend on the loaded core's exposed mapping — addresses you used on a " +
   "different core / system will NOT carry over.";
+
+const RETROPAD_TRANSPORT_NOTE =
+  "Transport: RetroArch's Network Gamepad receiver over UDP (default " +
+  "127.0.0.1:55400 + player index; requires `network_remote_enable = true` " +
+  "AND `network_remote_enable_user_p1 = true` (per player) in retroarch.cfg, " +
+  "or Settings > Input > Network Gamepad). This is a SEPARATE channel from " +
+  "the NCI command port — enabling Network Commands alone is not enough.";
+
+const RETROPAD_SEMANTICS_NOTE =
+  "Two receiver behaviors govern all input tools: " +
+  "(1) LATCHING — a pressed button stays down until an explicit release; " +
+  "there is no auto-release or keepalive. Always pair presses with releases " +
+  "or use retroarch_input_release_all. " +
+  "(2) ONE DATAGRAM PER FRAME — RetroArch consumes at most one queued input " +
+  "message per emulated frame per player, so N changes sent back-to-back " +
+  "land over N consecutive frames. For frame-accurate scripting: pause, then " +
+  "alternate one input tool call with one retroarch_frame_advance per change.";
+
+const BUTTON_NAME_LIST = Object.keys(BUTTON_IDS).join(", ");
 
 const TOOLS: Tool[] = [
   // ── Connectivity & introspection ────────────────────────────────────────
@@ -364,6 +384,164 @@ const TOOLS: Tool[] = [
       "RETURNS: Single line 'Decremented current slot' (UDP-send confirmation only — does NOT report the new slot number).",
     inputSchema: { type: "object", properties: {} },
   },
+
+  // ── Game-pad input (Network RetroPad) ──────────────────────────────────
+
+  {
+    name: "retroarch_input_press",
+    description:
+      "PURPOSE: Press (latch down) one or more RetroPad buttons for a player via RetroArch's Network Gamepad channel. " +
+      "USAGE: The low-level press primitive. For a simple press-and-release use retroarch_input_tap instead. For frame-accurate scripting: pause first, call this for ONE button, then retroarch_frame_advance, repeating per change (see BEHAVIOR for why). Buttons follow libretro RetroPad naming — on PlayStation cores: b=Cross, a=Circle, y=Square, x=Triangle. " +
+      `BEHAVIOR: ${RETROPAD_SEMANTICS_NOTE} ${FIRE_AND_FORGET_NOTE.replace("NCI does NOT", "Network Gamepad channel does NOT")} ${RETROPAD_TRANSPORT_NOTE} ` +
+      "RETURNS: 'Pressed BUTTONS (player N)' — UDP-send confirmation only; verify effect via memory read or screenshot.",
+    inputSchema: {
+      type: "object",
+      required: ["buttons"],
+      properties: {
+        buttons: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          description:
+            `RetroPad button names (case-insensitive): ${BUTTON_NAME_LIST}. ` +
+            "One datagram is sent per button; RetroArch applies one per emulated frame, " +
+            "so multiple buttons land on consecutive frames (all remain latched once applied).",
+        },
+        player: {
+          type: "integer",
+          minimum: 0,
+          maximum: 20,
+          description:
+            "Player index, 0-based. Player N's receiver listens at base port + N " +
+            "(default 55400 + N) and must be individually enabled in RetroArch " +
+            "(network_remote_enable_user_p<N+1>). Default 0 (Player 1).",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "retroarch_input_release",
+    description:
+      "PURPOSE: Release (latch up) one or more previously pressed RetroPad buttons for a player. " +
+      "USAGE: Counterpart to retroarch_input_press — every press must eventually be paired with a release (or retroarch_input_release_all), because the receiver latches state indefinitely. Releasing a button that is not pressed is harmless. " +
+      `BEHAVIOR: ${RETROPAD_SEMANTICS_NOTE} ${RETROPAD_TRANSPORT_NOTE} Fire-and-forget UDP — no acknowledgement. ` +
+      "RETURNS: 'Released BUTTONS (player N)' — UDP-send confirmation only.",
+    inputSchema: {
+      type: "object",
+      required: ["buttons"],
+      properties: {
+        buttons: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          description: `RetroPad button names (case-insensitive): ${BUTTON_NAME_LIST}.`,
+        },
+        player: {
+          type: "integer",
+          minimum: 0,
+          maximum: 20,
+          description: "Player index, 0-based (see retroarch_input_press). Default 0.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "retroarch_input_release_all",
+    description:
+      "PURPOSE: Zero every button and both analog sticks for a player in a single packet — the input panic button. " +
+      "USAGE: Use at the start and end of every scripted input session so no latched button leaks into or out of your script; also as recovery when you have lost track of which buttons are down. Unlike releasing 16 buttons individually (16 datagrams = 16 frames to drain), this clears everything in ONE datagram, applied on the next frame. " +
+      "BEHAVIOR: Implementation detail worth knowing: RetroArch's receiver zeroes all input state for a player whenever it reads a datagram whose size is not exactly sizeof(struct remote_message) — this tool sends a deliberately undersized datagram to trigger exactly that. Documented receiver behavior in input/input_driver.c, stable across RetroArch releases, but it is technically a protocol edge case rather than a designed command. " +
+      `${RETROPAD_TRANSPORT_NOTE} Fire-and-forget UDP — no acknowledgement. ` +
+      "RETURNS: 'Released all input (player N)' — UDP-send confirmation only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: {
+          type: "integer",
+          minimum: 0,
+          maximum: 20,
+          description: "Player index, 0-based (see retroarch_input_press). Default 0.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "retroarch_input_set_analog",
+    description:
+      "PURPOSE: Set one analog stick's X/Y position for a player (values persist until changed). " +
+      "USAGE: For analog movement, camera control, or pressure-sensitive navigation on cores that read analog sticks. Values are int16: -32768 (full left/up) to 32767 (full right/down), 0,0 = centered. Like buttons, analog state LATCHES — recenter with (0, 0) or retroarch_input_release_all when done. Sends two datagrams (X then Y), which the receiver applies over two consecutive frames. " +
+      `BEHAVIOR: ${RETROPAD_SEMANTICS_NOTE} ${RETROPAD_TRANSPORT_NOTE} Fire-and-forget UDP — no acknowledgement. ` +
+      "RETURNS: 'Analog STICK set to (X, Y) (player N)' — UDP-send confirmation only.",
+    inputSchema: {
+      type: "object",
+      required: ["stick", "x", "y"],
+      properties: {
+        stick: {
+          type: "string",
+          enum: ["left", "right"],
+          description: "Which analog stick to set.",
+        },
+        x: {
+          type: "integer",
+          minimum: -32768,
+          maximum: 32767,
+          description: "Horizontal axis: -32768 = full left, 0 = centered, 32767 = full right.",
+        },
+        y: {
+          type: "integer",
+          minimum: -32768,
+          maximum: 32767,
+          description: "Vertical axis: -32768 = full up, 0 = centered, 32767 = full down.",
+        },
+        player: {
+          type: "integer",
+          minimum: 0,
+          maximum: 20,
+          description: "Player index, 0-based (see retroarch_input_press). Default 0.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "retroarch_input_tap",
+    description:
+      "PURPOSE: Press buttons, hold them for a duration, then release them — the everyday building block for menu navigation and normal play. " +
+      "USAGE: Use while emulation is RUNNING (state 'playing' per retroarch_get_status). The default 100 ms hold spans ~6 frames at 60 fps, comfortably above the one-datagram-per-frame application delay and typical game input-polling windows. For frame-accurate work while PAUSED, do not use this tool — compose retroarch_input_press / retroarch_frame_advance / retroarch_input_release manually, because this tool's hold is wall-clock and a paused emulator never samples it. " +
+      `BEHAVIOR: Sends press datagrams, waits hold_ms of wall-clock time, sends release datagrams. Multiple buttons latch over consecutive frames (see below), so a two-button chord is fully held only from the second frame of the hold window onward. ${RETROPAD_SEMANTICS_NOTE} ${RETROPAD_TRANSPORT_NOTE} ` +
+      "RETURNS: 'Tapped BUTTONS for HOLDms (player N)' after the release datagrams are sent.",
+    inputSchema: {
+      type: "object",
+      required: ["buttons"],
+      properties: {
+        buttons: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          description: `RetroPad button names (case-insensitive): ${BUTTON_NAME_LIST}.`,
+        },
+        hold_ms: {
+          type: "integer",
+          minimum: 16,
+          maximum: 5000,
+          description:
+            "Wall-clock hold duration in milliseconds. Default 100 (~6 frames at 60 fps). " +
+            "Minimum 16 (~1 frame); values under ~50 ms risk the game's input poll missing " +
+            "the press entirely on cores that debounce.",
+        },
+        player: {
+          type: "integer",
+          minimum: 0,
+          maximum: 20,
+          description: "Player index, 0-based (see retroarch_input_press). Default 0.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 function ok(text: string) {
@@ -374,7 +552,9 @@ function addrHex(n: number): string {
   return `0x${n.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
-export function registerTools(server: Server, ra: RetroArchClient): void {
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+export function registerTools(server: Server, ra: RetroArchClient, pad: RetropadClient): void {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
@@ -432,6 +612,38 @@ export function registerTools(server: Server, ra: RetroArchClient): void {
       case "retroarch_show_message": {
         await ra.showMessage(p.message as string);
         return ok(`Showed: ${p.message}`);
+      }
+
+      case "retroarch_input_press": {
+        const buttons = p.buttons as string[];
+        const player = (p.player as number | undefined) ?? 0;
+        await pad.pressButtons(buttons, player);
+        return ok(`Pressed ${buttons.join("+")} (player ${player})`);
+      }
+      case "retroarch_input_release": {
+        const buttons = p.buttons as string[];
+        const player = (p.player as number | undefined) ?? 0;
+        await pad.releaseButtons(buttons, player);
+        return ok(`Released ${buttons.join("+")} (player ${player})`);
+      }
+      case "retroarch_input_release_all": {
+        const player = (p.player as number | undefined) ?? 0;
+        await pad.releaseAll(player);
+        return ok(`Released all input (player ${player})`);
+      }
+      case "retroarch_input_set_analog": {
+        const player = (p.player as number | undefined) ?? 0;
+        await pad.setAnalog(p.stick as StickName, p.x as number, p.y as number, player);
+        return ok(`Analog ${p.stick} set to (${p.x}, ${p.y}) (player ${player})`);
+      }
+      case "retroarch_input_tap": {
+        const buttons = p.buttons as string[];
+        const player = (p.player as number | undefined) ?? 0;
+        const holdMs = (p.hold_ms as number | undefined) ?? 100;
+        await pad.pressButtons(buttons, player);
+        await sleep(holdMs);
+        await pad.releaseButtons(buttons, player);
+        return ok(`Tapped ${buttons.join("+")} for ${holdMs}ms (player ${player})`);
       }
 
       case "retroarch_save_state_current":  await ra.saveStateCurrent();          return ok("Saved to current slot");
