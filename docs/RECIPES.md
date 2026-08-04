@@ -173,19 +173,30 @@ script: input state **latches** until released, and RetroArch applies at most
 ```
 1. retroarch_get_status                        # confirm 'playing' vs 'paused'
 2. retroarch_pause_toggle                      # pause (only if currently playing)
-3. retroarch_load_state_slot(slot=1)           # known anchor state
-4. retroarch_input_release_all                 # no latched leftovers
-5. retroarch_frame_advance                     # applies the release_all packet
-6. retroarch_input_press(buttons=["right"])
-7. retroarch_frame_advance                     # frame 1 — press applies here
-8. retroarch_frame_advance  × 7                # frames 2-8, Right held (latched)
-9. retroarch_input_release(buttons=["right"])
-10. retroarch_frame_advance                    # release applies
-11. retroarch_read_memory(address=..., length=...)   # observe the result
+3. retroarch_load_state_slot(slot=1)           # known anchor state — VERIFY, see below
+4. retroarch_frame_advance                     # flush: pushes the load task through
+5. retroarch_read_memory(...)                  # signature check: RAM matches the anchor?
+   <if not: repeat 3-5>
+6. retroarch_input_release_all                 # no latched leftovers
+7. retroarch_frame_advance                     # applies the release_all packet
+8. retroarch_input_press(buttons=["right"])
+9. retroarch_frame_advance                     # frame 1 — press applies here
+10. retroarch_frame_advance  × 7               # frames 2-8, Right held (latched)
+11. retroarch_input_release(buttons=["right"])
+12. retroarch_frame_advance                    # release applies
+13. retroarch_read_memory(address=..., length=...)   # observe the result
 ```
 
-Because every step is explicit — anchor state, one datagram per frame advance,
-then observe — the same script produces the same bytes every run. For casual
+**Why the verify loop (steps 3-5):** state loading is an asynchronous task
+inside RetroArch. While paused, the load can apply *seconds* after the command
+is acknowledged — sometimes after your whole scripted sequence has run,
+silently reverting it. Treat a state load as complete only after a small RAM
+read matches the anchor's known signature. (Verified empirically: with the
+signature check, 61-frame scripted runs over a 256 KiB RAM checksum are
+byte-identical across repeats; without it, they are not.)
+
+Because every step is explicit — verified anchor state, one datagram per frame
+advance, then observe — the same script produces the same bytes every run. For casual
 (non-frame-accurate) play while running, use `retroarch_input_tap` instead:
 press → ~100 ms hold → release in one call.
 
